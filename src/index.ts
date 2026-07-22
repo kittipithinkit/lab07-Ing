@@ -24,39 +24,46 @@ app.get("/", (req: Request, res: Response) => {
   res.send("API services for Student Data");
 });
 
-// GET /students
-// get students (by program)
-app.get("/students", (req: Request, res: Response) => {
+// GET /api/students
+// get students, can filter by studentId and/or program
+app.get("/api/students", (req: Request, res: Response) => {
   try {
-    const program = req.query.program;
+    // get value from query string, example: /api/students?studentId=650610001
+    const studentId = req.query.studentId as string;
+    const program = req.query.program as string;
 
-    if (program) {
-      let filtered_students = students.filter(
-        (student) => student.program === program
-      );
-      return res.json({
-        success: true,
-        data: filtered_students,
-      });
-    } else {
-      return res.json({
-        success: true,
-        count: students.length,
-        data: students,
+    // start with all students
+    let filtered_students = students;
+
+    // if user sent studentId, filter it
+    if (studentId !== undefined) {
+      filtered_students = filtered_students.filter(function (student) {
+        return student.studentId === studentId;
       });
     }
-  } catch (err) {
+
+    // if user also sent program, filter it too
+    if (program !== undefined) {
+      filtered_students = filtered_students.filter(function (student) {
+        return student.program === program;
+      });
+    }
+
     return res.json({
-      success: false,
+      ok: true,
+      students: filtered_students,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
       message: "Something is wrong, please try again",
-      error: err,
     });
   }
 });
 
-// POST /students, body = {new student data}
+// POST /api/students, body = {new student data}
 // add a new student
-app.post("/students", (req: Request, res: Response) => {
+app.post("/api/students", (req: Request, res: Response) => {
   try {
     const body = req.body as Student;
 
@@ -85,7 +92,7 @@ app.post("/students", (req: Request, res: Response) => {
     students.push(new_student);
 
     // add response header 'Link'
-    res.set("Link", `/students/${new_student.studentId}`);
+    res.set("Link", `/api/students/${new_student.studentId}`);
 
     return res.json({
       success: true,
@@ -101,9 +108,9 @@ app.post("/students", (req: Request, res: Response) => {
   }
 });
 
-// PUT /students, body = {studentId}
+// PUT /api/students, body = {studentId}
 // Update specified student
-app.put("/students", (req: Request, res: Response) => {
+app.put("/api/students", (req: Request, res: Response) => {
   try {
     const body = req.body as Student;
 
@@ -132,7 +139,7 @@ app.put("/students", (req: Request, res: Response) => {
     students[foundIndex] = { ...students[foundIndex], ...body };
 
     // add response header 'Link'
-    res.set("Link", `/students/${body.studentId}`);
+    res.set("Link", `/api/students/${body.studentId}`);
 
     return res.json({
       success: true,
@@ -148,14 +155,63 @@ app.put("/students", (req: Request, res: Response) => {
   }
 });
 
-// DELETE /students, body = {studentId}
-app.delete("/students", (req: Request, res: Response) => {
-  res.json({
-    message: "Implement this!"
-  })
+// DELETE /api/students, body = {studentId}
+// remove a student from the system
+app.delete("/api/students", (req: Request, res: Response) => {
+  try {
+    const body = req.body;
+
+    // check if studentId is valid (must be 9 characters)
+    const result = zStudentDeleteBody.safeParse(body);
+    if (result.success === false) {
+      return res.status(400).json({
+        ok: false,
+        message: "Student Id must contain 9 characters",
+      });
+    }
+
+    const studentId = body.studentId;
+
+    // find the student we want to delete
+    let foundIndex = -1;
+    for (let i = 0; i < students.length; i++) {
+      if (students[i].studentId === studentId) {
+        foundIndex = i;
+      }
+    }
+
+    // not found in the system
+    if (foundIndex === -1) {
+      return res.status(404).json({
+        ok: false,
+        message: "Student ID does not exist",
+      });
+    }
+
+    // found, so delete it from the array
+    students.splice(foundIndex, 1);
+
+    return res.status(200).json({
+      ok: true,
+      message: "Student Id " + studentId + " has been deleted",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      message: "Something is wrong, please try again",
+    });
+  }
 });
 
 // GET /api/me
+// show name and studentId of the person who made this
+app.get("/api/me", (req: Request, res: Response) => {
+  return res.json({
+    ok: true,
+    fullName: "กิตติพิชญ์ เมฆอรุณกมล",
+    studentId: "680610655",
+  });
+});
 
 app.listen(port, async () => {
   console.log(`🚀 Server running on http://localhost:${port}`);
